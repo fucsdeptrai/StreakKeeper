@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StreakKeeper — System Tray Companion</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            surface: {
+              DEFAULT: '#10141a',
+              dim: '#0a0e14',
+              card: '#161b22',
+              hover: '#1f242c',
+              border: '#30363d',
+              borderLight: '#424a53',
+            },
+            flame: {
+              DEFAULT: '#FF6B35',
+              dark: '#E65100',
+              glow: 'rgba(255, 107, 53, 0.15)',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background-color: transparent;
+      margin: 0;
+      padding: 24px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      font-family: 'Inter', sans-serif;
+    }
+    .tray-bubble {
+      box-shadow: 0 20px 40px -10px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.08);
+    }
+  </style>
+</head>
+<body class="bg-slate-950/80 antialiased selection:bg-orange-500 selection:text-white">
+
+  <!-- Desktop Environment Simulation Frame -->
+  <div class="relative flex flex-col items-center">
+    
+    <!-- Simulated macOS / Windows Menu Bar Segment -->
+    <div class="w-[380px] bg-[#161B22]/90 backdrop-blur-md border border-[#30363D] rounded-t-xl px-4 py-2 flex items-center justify-between text-xs text-slate-400 mb-[-1px] z-10">
+      <div class="flex items-center gap-2">
+        <span class="text-slate-500 font-mono text-[10px]">TRAY BAR</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="text-slate-400">18:14</span>
+        <div class="flex items-center gap-1.5 px-2 py-0.5 rounded bg-orange-500/10 border border-orange-500/30 text-orange-400 font-medium">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C12 2 15 6 15 9C15 10.5 14.5 11.5 13.5 12.5C14.5 12.8 15.5 13.5 16 14.5C17 16 17 18 16.5 19.5C15.8 21.8 13.5 23 11 23C7 23 4 20 4 16C4 12 7 8 9.5 5C9.8 4.6 10.5 4.8 10.5 5.3C10.5 7 11.5 8.2 12.5 9C13 7.8 12.8 5.5 12 3.5C11.8 3 12.3 2.5 12 2Z"/>
+          </svg>
+          <span class="text-[11px] font-mono font-semibold">8/9</span>
+        </div>
+        <div class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
+      </div>
+    </div>
+
+    <!-- System Tray Window Popup (Actual App Component) -->
+    <div class="tray-bubble w-[380px] bg-[#10141a] rounded-b-xl rounded-t-sm border border-[#30363d] overflow-hidden text-slate-200">
+      
+      <!-- Top Title and Status Header -->
+      <div class="p-3.5 border-b border-[#21262d] bg-[#161b22]/50 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-7 h-7 rounded-lg bg-orange-500/15 border border-orange-500/30 flex items-center justify-center text-orange-400">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C12 2 15 6 15 9C15 10.5 14.5 11.5 13.5 12.5C14.5 12.8 15.5 13.5 16 14.5C17 16 17 18 16.5 19.5C15.8 21.8 13.5 23 11 23C7 23 4 20 4 16C4 12 7 8 9.5 5C9.8 4.6 10.5 4.8 10.5 5.3C10.5 7 11.5 8.2 12.5 9C13 7.8 12.8 5.5 12 3.5C11.8 3 12.3 2.5 12 2Z"/>
+            </svg>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h2 class="text-xs font-semibold text-white tracking-wide">StreakKeeper</h2>
+              <span class="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">LIVE</span>
+            </div>
+            <p class="text-[11px] text-slate-400">Daemon active • PID 4819</p>
+          </div>
+        </div>
+
+        <button class="px-2 py-1 rounded bg-[#21262d] hover:bg-[#30363d] text-slate-300 text-[11px] font-medium border border-[#30363d] flex items-center gap-1 transition-colors">
+          <svg class="w-3 h-3 text-orange-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+          </svg>
+          Check Now
+        </button>
+      </div>
+
+      <!-- Quick Summary Metric Card -->
+      <div class="p-3 bg-gradient-to-b from-[#161b22] to-[#10141a] border-b border-[#21262d]">
+        <div class="flex items-center justify-between text-xs mb-1.5">
+          <span class="text-slate-300 font-medium">Today's Streak Health</span>
+          <span class="font-mono text-orange-400 font-semibold">8 of 9 Completed</span>
+        </div>
+        <div class="w-full h-2 rounded-full bg-slate-800 overflow-hidden flex gap-0.5">
+          <div class="h-full bg-emerald-500 w-[88.8%]"></div>
+          <div class="h-full bg-amber-500 w-[11.2%]"></div>
+        </div>
+        <div class="flex items-center justify-between mt-2 text-[10px] text-slate-400 font-mono">
+          <span>Next scheduled check: 18:45</span>
+          <span class="text-amber-400">1 streak expiring soon</span>
+        </div>
+      </div>
+
+      <!-- Compact Status List of Platforms -->
+      <div class="divide-y divide-[#21262d]/60">
+        
+        <!-- TikTok Status Item -->
+        <div class="p-3 hover:bg-[#161b22]/40 transition-colors flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <div class="w-6 h-6 rounded-md bg-black border border-slate-700 flex items-center justify-center text-white text-[11px] font-bold">
+              TT
+            </div>
+            <div>
+              <div class="text-xs font-medium text-slate-200 flex items-center gap-1.5">
+                TikTok Friends
+                <span class="text-[10px] text-slate-400 font-normal">(4 active)</span>
+              </div>
+              <div class="text-[11px] text-amber-400 flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                @alex_creates needs nudge (5h left)
+              </div>
+            </div>
+          </div>
+          <span class="font-mono text-xs text-slate-300 font-medium">3/4 Done</span>
+        </div>
+
+        <!-- Duolingo Status Item -->
+        <div class="p-3 hover:bg-[#161b22]/40 transition-colors flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <div class="w-6 h-6 rounded-md bg-emerald-600/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 text-xs">
+              🦉
+            </div>
+            <div>
+              <div class="text-xs font-medium text-slate-200 flex items-center gap-1.5">
+                Duolingo Daily
+                <span class="text-[10px] text-emerald-400 font-mono font-medium">🔥 428d</span>
+              </div>
+              <div class="text-[11px] text-emerald-400 flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                Completed today at 07:15 (+15 XP)
+              </div>
+            </div>
+          </div>
+          <span class="text-emerald-400 text-xs">✓ Done</span>
+        </div>
+
+      </div>
+
+      <!-- Quick Action Controls List (Raycast Style) -->
+      <div class="p-1.5 bg-[#0a0e14] border-t border-[#21262d] space-y-0.5 text-xs">
+        
+        <button class="w-full px-2.5 py-1.5 rounded-md hover:bg-[#1c2128] text-slate-300 hover:text-white flex items-center justify-between transition-colors group">
+          <div class="flex items-center gap-2">
+            <svg class="w-3.5 h-3.5 text-slate-400 group-hover:text-orange-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="9" y1="3" x2="9" y2="21"></line>
+            </svg>
+            <span>Open Main Window</span>
+          </div>
+          <kbd class="text-[10px] font-mono text-slate-500 bg-[#161b22] px-1.5 py-0.5 rounded border border-slate-700">Cmd+O</kbd>
+        </button>
+
+        <button class="w-full px-2.5 py-1.5 rounded-md hover:bg-[#1c2128] text-slate-300 hover:text-white flex items-center justify-between transition-colors group">
+          <div class="flex items-center gap-2">
+            <svg class="w-3.5 h-3.5 text-slate-400 group-hover:text-amber-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <rect x="6" y="4" width="4" height="16"></rect>
+              <rect x="14" y="4" width="4" height="16"></rect>
+            </svg>
+            <span>Pause Automation (2 hours)</span>
+          </div>
+          <kbd class="text-[10px] font-mono text-slate-500 bg-[#161b22] px-1.5 py-0.5 rounded border border-slate-700">Cmd+P</kbd>
+        </button>
+
+        <div class="h-[1px] bg-[#21262d] my-1"></div>
+
+        <button class="w-full px-2.5 py-1.5 rounded-md hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 flex items-center justify-between transition-colors group">
+          <div class="flex items-center gap-2">
+            <svg class="w-3.5 h-3.5 text-slate-500 group-hover:text-rose-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+            </svg>
+            <span>Quit StreakKeeper Daemon</span>
+          </div>
+          <kbd class="text-[10px] font-mono text-slate-500 bg-[#161b22] px-1.5 py-0.5 rounded border border-slate-700">Cmd+Q</kbd>
+        </button>
+
+      </div>
+
+      <!-- Micro Footer status bar -->
+      <div class="px-3 py-1.5 bg-[#070a0e] text-[10px] font-mono text-slate-500 flex items-center justify-between border-t border-[#1c2128]">
+        <span>SQLite: sync OK (1.2ms)</span>
+        <span>v2.4.1</span>
+      </div>
+
+    </div>
+
+  </div>
+
+</body>
+</html>

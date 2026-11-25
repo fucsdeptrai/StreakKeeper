@@ -1,0 +1,11 @@
+.venv/
+dist/
+__pycache__/
+*.egg-info/
+.DS_Store
+.env
+.env.*
+!.env.example
+*.sqlite3
+*.sqlite3-*
+headless-chrome/
