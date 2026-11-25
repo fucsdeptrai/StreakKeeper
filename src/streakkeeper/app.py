@@ -25,6 +25,28 @@ from .streak_schedule import next_streak_run, pending_streak_chats
 from .theme import STYLESHEET
 
 
+LOG_RESULTS = {
+    Status.SENT: ("Đã gửi", "Tin nhắn đã xuất hiện trong cuộc trò chuyện.", "green"),
+    Status.APP_SENT_TODAY: ("Đã gửi trước đó", "App đã gửi cho chat này trong ngày, nên bỏ qua lượt này.", "blue"),
+    Status.HAS_OUTGOING: ("Đã có tin đi", "Cuộc trò chuyện đã có tin đi trong ngày.", "blue"),
+    Status.UNCONFIRMED: ("Chưa rõ đã gửi", "App chưa xác nhận tin đã tới chat. Lượt sau có thể thử lại.", "amber"),
+    Status.UNKNOWN: ("Chưa rõ kết quả", "Chưa đủ thông tin để xác nhận kết quả lần này.", "amber"),
+    Status.SENDER_UNVERIFIED: ("Chưa rõ người gửi", "Chưa xác nhận được tài khoản gửi. Kiểm tra phiên trong Settings.", "red"),
+    Status.LOGIN_REQUIRED: ("Cần đăng nhập lại", "Vào Settings để kết nối lại tài khoản TikTok.", "red"),
+    Status.VERIFICATION_REQUIRED: ("Cần xác minh", "Mở TikTok và hoàn tất bước xác minh bảo mật.", "red"),
+    Status.NO_OUTGOING: ("Chưa có tin đi", "Lượt kiểm tra chưa thấy tin đi trong ngày.", "gray"),
+    Status.LIMIT: ("Hết lượt thử", "Đã dùng hết số lượt thử gửi trong ngày.", "gray"),
+}
+
+LOG_COLORS = {
+    "green": ("#92eda8", "#193629"),
+    "blue": ("#a3ccff", "#20334c"),
+    "amber": ("#ffda8a", "#3d3019"),
+    "red": ("#ffb7b2", "#412526"),
+    "gray": ("#c7ccd7", "#2b3039"),
+}
+
+
 class StreakRun(QThread):
     progress = Signal(str, str)
 
@@ -186,7 +208,7 @@ class Window(QMainWindow):
             ("▦", "Dashboard", self.dashboard_page),
             ("ϟ", "TikTok", self.tiktok_page),
             ("♧", "Duolingo", self.duolingo_page),
-            ("▤", "Activity Log", self.activity_page),
+            ("▤", "Nhật ký", self.activity_page),
             ("⚙", "Settings", self.settings_page),
         )):
             self.pages.addWidget(builder())
@@ -209,7 +231,7 @@ class Window(QMainWindow):
         self.pause_button.clicked.connect(self.toggle_pause)
         row.addWidget(self.pause_button)
         tray_button = QPushButton("Thu nhỏ" if sys.platform == "win32" else "Tray")
-        tray_button.clicked.connect(self.close)
+        tray_button.clicked.connect(self.showMinimized if sys.platform == "win32" else self.close)
         row.addWidget(tray_button)
         status_layout.addLayout(row)
         navigation.addWidget(status_box)
@@ -527,7 +549,7 @@ class Window(QMainWindow):
         self.refresh_streak_history()
 
     def set_streak_summary(self, message):
-        for label in (self.streak_summary, self.dashboard_run_status):
+        for label in (self.streak_summary, self.dashboard_run_status, self.log_run_status):
             label.setText(message)
             label.setVisible(bool(message))
 
@@ -620,6 +642,7 @@ class Window(QMainWindow):
             for time, target, status in (self.store.activity(owner) if owner else [])
         ]
         self.fill_history(self.history, rows)
+        self.filter_history()
         self.fill_history(self.live_recent, rows[:5])
         self.live_recent.setVisible(bool(rows))
         self.live_recent_empty.setVisible(not rows)
@@ -643,25 +666,31 @@ class Window(QMainWindow):
         return page
 
     def activity_page(self):
-        page, layout = self.page("NHẬT KÝ", "Activity Log", "Kết quả kiểm tra được lưu trên máy · Giờ Việt Nam.")
+        page, layout = self.page("TIKTOK", "Nhật ký", "Kết quả từng lượt giữ chuỗi · Giờ Việt Nam.")
         card, content = self.panel()
         if not self.demo:
-            content.addWidget(self.label("Kết quả các lượt giữ chuỗi", "heading"))
-            self.history = self.table(["Thời điểm", "Cuộc trò chuyện", "Kết quả"])
-            content.addWidget(self.history)
-            layout.addWidget(card, 1)
-            return page
+            self.log_run_status = self.label("", "noteText")
+            self.log_run_status.setWordWrap(True)
+            self.log_run_status.hide()
+            content.addWidget(self.log_run_status)
         filters = QHBoxLayout()
         self.log_search = QLineEdit()
         self.log_search.setPlaceholderText("Tìm người nhận hoặc kết quả")
         self.log_search.textChanged.connect(self.filter_history)
         filters.addWidget(self.log_search, 1)
         self.log_status = QComboBox()
-        self.log_status.addItems(["Tất cả kết quả", *(state.value for state in Status)])
+        self.log_status.addItem("Tất cả kết quả")
+        for state, (label, _, _) in LOG_RESULTS.items():
+            self.log_status.addItem(label, state.value)
         self.log_status.currentIndexChanged.connect(self.filter_history)
         filters.addWidget(self.log_status)
         content.addLayout(filters)
-        self.history = self.table(["Thời điểm", "Cuộc trò chuyện", "Kết quả"])
+        self.history = self.table(["Thời điểm", "Cuộc trò chuyện", "Kết quả", "Chi tiết"])
+        header = self.history.horizontalHeader()
+        for column, width in enumerate((125, 125, 140)):
+            header.setSectionResizeMode(column, QHeaderView.ResizeMode.Interactive)
+            header.resizeSection(column, width)
+        self.history.verticalHeader().setDefaultSectionSize(58)
         content.addWidget(self.history)
         self.log_count = self.label("", "muted")
         content.addWidget(self.log_count)
@@ -858,8 +887,8 @@ class Window(QMainWindow):
 
     def closeEvent(self, event):
         if sys.platform == "win32":
-            self.showMinimized()
-            event.ignore()
+            self.tray.hide()
+            super().closeEvent(event)
         elif self.tray.isVisible():
             self.hide()
             event.ignore()
@@ -950,8 +979,23 @@ class Window(QMainWindow):
         table.setRowCount(len(rows))
         for index, (timestamp, target, status) in enumerate(rows):
             local = datetime.fromisoformat(timestamp).astimezone(VIETNAM)
-            for column, value in enumerate((local.strftime("%d/%m %H:%M:%S"), target, status)):
-                table.setItem(index, column, self.table_item(value, status=column == 2))
+            label, detail, color = LOG_RESULTS.get(status, (status, "", "gray"))
+            foreground, background = LOG_COLORS[color]
+            result = self.table_item(label)
+            result.setData(Qt.ItemDataRole.UserRole, status)
+            result.setToolTip(detail)
+            result.setForeground(QColor(foreground))
+            result.setBackground(QColor(background))
+            font = result.font()
+            font.setBold(True)
+            result.setFont(font)
+            table.setItem(index, 0, self.table_item(local.strftime("%d/%m %H:%M:%S")))
+            table.setItem(index, 1, self.table_item(target))
+            table.setItem(index, 2, result)
+            if table.columnCount() == 4:
+                detail_item = self.table_item(detail)
+                detail_item.setToolTip(detail)
+                table.setItem(index, 3, detail_item)
 
     def refresh_history(self):
         rows = self.store.activity()
@@ -962,15 +1006,15 @@ class Window(QMainWindow):
 
     def filter_history(self):
         query = self.log_search.text().strip().casefold()
-        status = self.log_status.currentText() if self.log_status.currentIndex() else ""
+        status = self.log_status.currentData()
         matches = 0
         for row in range(self.history.rowCount()):
-            name = self.history.item(row, 1).text()
-            result = self.history.item(row, 2).text()
-            show = (query in name.casefold() or query in result.casefold()) and (not status or status == result)
+            result = self.history.item(row, 2)
+            text_matches = any(query in self.history.item(row, column).text().casefold() for column in (1, 2, 3))
+            show = text_matches and (status is None or status == result.data(Qt.ItemDataRole.UserRole))
             self.history.setRowHidden(row, not show)
             matches += int(show)
-        self.log_count.setText(f"{matches} / {self.history.rowCount()} lượt kiểm tra")
+        self.log_count.setText(f"{matches} / {self.history.rowCount()} mục" if self.history.rowCount() else "Chưa có hoạt động.")
 
     def toggle_pause(self):
         paused = self.store.get("paused") == "1"

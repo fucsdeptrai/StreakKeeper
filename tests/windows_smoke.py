@@ -10,7 +10,7 @@ from tempfile import TemporaryDirectory
 import time
 
 from PySide6.QtCore import QTimer
-from PySide6.QtWidgets import QApplication, QSystemTrayIcon
+from PySide6.QtWidgets import QApplication, QPushButton, QSystemTrayIcon
 
 from streakkeeper.app import Window
 from streakkeeper.core import Store
@@ -60,6 +60,24 @@ def check_executable(executable: Path, data_dir: Path):
 
         duplicate = subprocess.run(args, cwd=data_dir.parent, env=env, timeout=10)
         assert duplicate.returncode == 1 and process.poll() is None, "The app accepted a duplicate instance"
+
+        user32 = ctypes.WinDLL("user32", use_last_error=True)
+        user32.FindWindowW.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR]
+        user32.FindWindowW.restype = wintypes.HWND
+        user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+        user32.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+        user32.PostMessageW.restype = wintypes.BOOL
+        owner = wintypes.DWORD()
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline and process.poll() is None:
+            hwnd = user32.FindWindowW(None, "StreakKeeper")
+            if hwnd and user32.GetWindowThreadProcessId(hwnd, ctypes.byref(owner)) and owner.value == process.pid:
+                break
+            time.sleep(0.2)
+        else:
+            raise RuntimeError("The packaged app window could not be found")
+        assert user32.PostMessageW(hwnd, 0x0010, 0, 0), "Could not send the Windows close message"
+        assert process.wait(timeout=15) == 0, "Clicking X did not exit the packaged app"
     finally:
         if process.poll() is None:
             process.terminate()
@@ -71,11 +89,12 @@ def check_window_restore(data_dir: Path):
     window = Window(Store(data_dir / "demo.sqlite3"), data_dir, demo=True)
     window.show()
     app.processEvents()
+    minimize = next(button for button in window.findChildren(QPushButton) if button.text() == "Thu nhỏ")
 
     window.tray.hide()
-    window.close()
+    minimize.click()
     app.processEvents()
-    assert window.isVisible() and window.isMinimized(), "Closing with no tray icon removed the window"
+    assert window.isVisible() and window.isMinimized(), "Minimizing with no tray icon removed the window"
 
     user32 = ctypes.WinDLL("user32")
     user32.IsIconic.argtypes = [wintypes.HWND]
@@ -88,8 +107,8 @@ def check_window_restore(data_dir: Path):
     assert window.isVisible() and not window.isMinimized(), "Windows failed to restore the window"
 
     window.tray.show()
-    window.close()
-    assert window.isVisible() and window.isMinimized(), "Closing with a tray icon removed the window"
+    minimize.click()
+    assert window.isVisible() and window.isMinimized(), "Minimizing with a tray icon removed the window"
     window.tray.activated.emit(QSystemTrayIcon.ActivationReason.Trigger)
     assert window.isVisible() and not window.isMinimized(), "The tray icon failed to restore the window"
 
@@ -105,4 +124,4 @@ if __name__ == "__main__":
         check_chrome(data / "browser" / "headless-chrome")
         check_executable(Path(sys.argv[1]).resolve(), data / "application")
         check_window_restore(data / "window")
-    print("Windows executable, single-instance lock, persistent Chrome profile and window restore passed")
+    print("Windows executable, native close, minimize and restore, single-instance lock and Chrome profile passed")
