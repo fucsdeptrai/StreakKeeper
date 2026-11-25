@@ -208,7 +208,7 @@ class Window(QMainWindow):
         self.pause_button = QPushButton()
         self.pause_button.clicked.connect(self.toggle_pause)
         row.addWidget(self.pause_button)
-        tray_button = QPushButton("Tray")
+        tray_button = QPushButton("Thu nhỏ" if sys.platform == "win32" else "Tray")
         tray_button.clicked.connect(self.close)
         row.addWidget(tray_button)
         status_layout.addLayout(row)
@@ -823,7 +823,11 @@ class Window(QMainWindow):
         menu.addAction("Kiểm tra ngay", self.check_now)
         self.pause_action = menu.addAction("Tạm dừng", self.toggle_pause)
         self.pause_action.setCheckable(True)
-        menu.addAction("Thoát", QApplication.instance().quit)
+        app = QApplication.instance()
+        if sys.platform == "win32":
+            menu.addAction("Thoát", lambda: app.exit(0))
+        else:
+            menu.addAction("Thoát", app.quit)
         self.menuBar().addMenu(menu)
         menu.setTitle("StreakKeeper")
         tray_menu = QMenu(self)
@@ -833,7 +837,7 @@ class Window(QMainWindow):
         if QSystemTrayIcon.isSystemTrayAvailable():
             self.tray.show()
         if sys.platform == "darwin":
-            QApplication.instance().applicationStateChanged.connect(self.restore_window_on_activation)
+            app.applicationStateChanged.connect(self.restore_window_on_activation)
         elif sys.platform == "win32":
             self.tray.activated.connect(self.restore_window_from_tray)
 
@@ -842,7 +846,7 @@ class Window(QMainWindow):
             self.show_window()
 
     def restore_window_from_tray(self, reason):
-        if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
+        if reason in (QSystemTrayIcon.ActivationReason.Trigger, QSystemTrayIcon.ActivationReason.DoubleClick):
             self.show_window()
 
     def show_window(self):
@@ -853,7 +857,10 @@ class Window(QMainWindow):
         self.activateWindow()
 
     def closeEvent(self, event):
-        if self.tray.isVisible():
+        if sys.platform == "win32":
+            self.showMinimized()
+            event.ignore()
+        elif self.tray.isVisible():
             self.hide()
             event.ignore()
         else:

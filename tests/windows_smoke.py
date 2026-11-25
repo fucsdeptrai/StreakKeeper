@@ -1,4 +1,6 @@
 from contextlib import closing
+import ctypes
+from ctypes import wintypes
 import os
 from pathlib import Path
 import sqlite3
@@ -7,6 +9,11 @@ import sys
 from tempfile import TemporaryDirectory
 import time
 
+from PySide6.QtCore import QTimer
+from PySide6.QtWidgets import QApplication, QSystemTrayIcon
+
+from streakkeeper.app import Window
+from streakkeeper.core import Store
 from streakkeeper.streak_browser import active_login_pid, chrome_session
 
 
@@ -59,9 +66,43 @@ def check_executable(executable: Path, data_dir: Path):
             process.wait(timeout=10)
 
 
+def check_window_restore(data_dir: Path):
+    app = QApplication(["streakkeeper-window-smoke"])
+    window = Window(Store(data_dir / "demo.sqlite3"), data_dir, demo=True)
+    window.show()
+    app.processEvents()
+
+    window.tray.hide()
+    window.close()
+    app.processEvents()
+    assert window.isVisible() and window.isMinimized(), "Closing with no tray icon removed the window"
+
+    user32 = ctypes.WinDLL("user32")
+    user32.IsIconic.argtypes = [wintypes.HWND]
+    user32.IsIconic.restype = wintypes.BOOL
+    user32.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
+    user32.ShowWindow.restype = wintypes.BOOL
+    assert user32.IsIconic(int(window.winId())), "Windows did not minimize the window"
+    user32.ShowWindow(int(window.winId()), 9)  # SW_RESTORE, used by the taskbar
+    app.processEvents()
+    assert window.isVisible() and not window.isMinimized(), "Windows failed to restore the window"
+
+    window.tray.show()
+    window.close()
+    assert window.isVisible() and window.isMinimized(), "Closing with a tray icon removed the window"
+    window.tray.activated.emit(QSystemTrayIcon.ActivationReason.Trigger)
+    assert window.isVisible() and not window.isMinimized(), "The tray icon failed to restore the window"
+
+    quit_action = next(action for action in window.tray.contextMenu().actions() if action.text() == "Thoát")
+    QTimer.singleShot(0, quit_action.trigger)
+    QTimer.singleShot(1500, lambda: app.exit(13))
+    assert app.exec() == 0, "The explicit Quit action did not exit"
+
+
 if __name__ == "__main__":
     with TemporaryDirectory(prefix="streakkeeper smoke ") as directory:
         data = Path(directory)
         check_chrome(data / "browser" / "headless-chrome")
         check_executable(Path(sys.argv[1]).resolve(), data / "application")
-    print("Windows executable, single-instance lock and persistent Chrome profile passed")
+        check_window_restore(data / "window")
+    print("Windows executable, single-instance lock, persistent Chrome profile and window restore passed")
