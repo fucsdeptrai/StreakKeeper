@@ -24,9 +24,6 @@ jobs:
           uv run --locked --python 3.11 --with pyinstaller==6.22.3 pyinstaller
           --onedir --windowed --name StreakKeeper --paths src src/streakkeeper/__main__.py
 
-      - name: Smoke test the executable and Chrome profile
-        run: uv run --locked --python 3.11 python tests/windows_smoke.py dist/StreakKeeper/StreakKeeper.exe
-
       - name: Create ZIP and checksum
         run: |
           $version = uv run --locked --python 3.11 python -c "from importlib.metadata import version; print(version('streakkeeper'))"
@@ -34,7 +31,14 @@ jobs:
           $zip = "StreakKeeper-$version-windows-x64.zip"
           Compress-Archive -Path dist/StreakKeeper -DestinationPath "dist/$zip"
           $hash = (Get-FileHash -Algorithm SHA256 "dist/$zip").Hash.ToLowerInvariant()
-          Set-Content -Encoding ascii -Path "dist/$zip.sha256" -Value "$hash  $zip"
+          [IO.File]::WriteAllText((Join-Path $PWD "dist/$zip.sha256"), "$hash  $zip`n")
+
+      - name: Smoke test the extracted app and Chrome profile
+        run: |
+          $archive = Get-ChildItem dist/StreakKeeper-*-windows-x64.zip
+          $unpacked = Join-Path $env:RUNNER_TEMP 'StreakKeeper Windows'
+          Expand-Archive -LiteralPath $archive.FullName -DestinationPath $unpacked
+          uv run --locked --python 3.11 python tests/windows_smoke.py (Join-Path $unpacked 'StreakKeeper/StreakKeeper.exe')
 
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
