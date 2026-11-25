@@ -10,3 +10,4 @@ __pycache__/
 *.sqlite3-*
 headless-chrome/
 /stitch_streakkeeper_desktop_app/
+/private/

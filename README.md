@@ -40,9 +40,3 @@ Kiểm thử quy tắc gửi bằng Python 3.11 trở lên, không cần PySide6
 ```sh
 PYTHONPATH=src python3 -m unittest discover -s tests -v
 ```
-
-## Bắt đầu đọc
-
-1. [PRD thử nghiệm TikTok trên macOS](PRD.md) mô tả phạm vi bản đầu và tiêu chí nghiệm thu.
-2. [Kế hoạch phát hành macOS](DISTRIBUTION.md) mô tả cách đóng gói và các điều kiện trước khi đưa app cho người dùng.
-3. [Project brief](StreakKeeper_Project.md) mô tả phạm vi MVP, kiến trúc, mô hình dữ liệu dự kiến và tiêu chí nghiệm thu. Cấu trúc thư mục ở mục 8 là đề xuất triển khai.
