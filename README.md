@@ -8,9 +8,9 @@ App dùng Google Chrome đã cài trên máy. Gói tải đã kèm Python và c�
 
 ### Windows x64
 
-**[Tải StreakKeeper 0.1.1 cho Windows x64](https://github.com/fucsdeptrai/StreakKeeper/releases/download/v0.1.1/StreakKeeper-0.1.1-windows-x64.zip)** · [SHA-256](https://github.com/fucsdeptrai/StreakKeeper/releases/download/v0.1.1/StreakKeeper-0.1.1-windows-x64.zip.sha256)
+**[Tải StreakKeeper 0.1.2 cho Windows x64](https://github.com/fucsdeptrai/StreakKeeper/releases/download/v0.1.2/StreakKeeper-0.1.2-windows-x64.zip)** · [SHA-256](https://github.com/fucsdeptrai/StreakKeeper/releases/download/v0.1.2/StreakKeeper-0.1.2-windows-x64.zip.sha256)
 
-Giải nén toàn bộ ZIP và mở **StreakKeeper.exe** trong thư mục vừa giải nén. Để mở lại sau khi thu xuống khay hệ thống, nhấp đúp biểu tượng StreakKeeper cạnh đồng hồ. Bản thử chưa có chữ ký số.
+Giải nén toàn bộ ZIP và mở **StreakKeeper.exe** trong thư mục vừa giải nén. Bấm **Thu nhỏ** hoặc **X** để thu cửa sổ xuống thanh tác vụ, rồi bấm StreakKeeper trên thanh đó để mở lại. Chọn **StreakKeeper → Thoát** để dừng app. Bản thử chưa có chữ ký số.
 
 ### Mac Apple Silicon
 
@@ -29,7 +29,7 @@ Bấm **Mở hộp thư** để đọc danh sách ở nền. Nhấp đúp vào t
 
 Bấm **Chạy giữ chuỗi** để gửi cho các chat đã chọn nếu app chưa ghi nhận gửi thành công hôm nay, tính theo giờ Việt Nam. Tin bạn gửi thủ công không chặn lượt gửi. Nếu kết quả chưa rõ, lần bấm tiếp theo có thể thử lại. Cả đọc hộp thư và chạy giữ chuỗi dùng cùng hồ sơ riêng ở chế độ headless. Xem kết quả trong **Activity Log**.
 
-Trong **Settings → Lịch gửi tự động**, bật tự động giữ chuỗi nếu bạn muốn app gửi khi đang chạy. Mặc định, lượt đầu bắt đầu khi có chat cần gửi. Có thể đặt giờ bắt đầu mỗi ngày theo giờ Việt Nam. Các lượt sau cách 15 phút và chỉ xử lý chat còn thiếu. Khi gửi đủ, app chờ ngày mới hoặc một chat mới được chọn. Đóng xuống thanh menu vẫn giữ lịch chạy. Nút **Tạm dừng** dừng lượt tự động.
+Trong **Settings → Lịch gửi tự động**, bật tự động giữ chuỗi nếu bạn muốn app gửi khi đang chạy. Mặc định, lượt đầu bắt đầu khi có chat cần gửi. Có thể đặt giờ bắt đầu mỗi ngày theo giờ Việt Nam. Các lượt sau cách 15 phút và chỉ xử lý chat còn thiếu. Khi gửi đủ, app chờ ngày mới hoặc một chat mới được chọn. Lịch vẫn chạy khi thu cửa sổ xuống. Nút **Tạm dừng** dừng lượt tự động.
 
 ## Phát triển
 
