@@ -8,7 +8,7 @@ App dùng Google Chrome đã cài trên máy. Gói tải đã kèm Python và c�
 
 ### Windows x64
 
-**[Tải StreakKeeper 0.1.3 cho Windows x64](https://github.com/fucsdeptrai/StreakKeeper/releases/download/v0.1.3/StreakKeeper-0.1.3-windows-x64.zip)** · [SHA-256](https://github.com/fucsdeptrai/StreakKeeper/releases/download/v0.1.3/StreakKeeper-0.1.3-windows-x64.zip.sha256)
+**[Tải StreakKeeper 0.1.3 cho Windows x64](https://github.com/fucsdeptrai/StreakKeeper/releases/download/v0.1.3-windows/StreakKeeper-0.1.3-windows-x64.zip)** · [SHA-256](https://github.com/fucsdeptrai/StreakKeeper/releases/download/v0.1.3-windows/StreakKeeper-0.1.3-windows-x64.zip.sha256)
 
 Giải nén toàn bộ ZIP và mở **StreakKeeper.exe** trong thư mục vừa giải nén. Bấm **Thu nhỏ** để app tiếp tục chạy và mở lại từ thanh tác vụ. Bấm **X** hoặc chọn **StreakKeeper → Thoát** để dừng app. Bản thử chưa có chữ ký số.
 
