@@ -31,7 +31,8 @@ def check_executable(executable: Path, data_dir: Path):
     env = os.environ.copy()
     env.pop("PYTHONPATH", None)
     env.pop("VIRTUAL_ENV", None)
-    env["PATH"] = os.pathsep.join(str(Path(env["SystemRoot"]) / name) for name in ("System32", ""))
+    windows = Path(os.environ["SystemRoot"])
+    env["PATH"] = os.pathsep.join((str(windows / "System32"), str(windows)))
     node = executable.parent / "_internal" / "playwright" / "driver" / "node.exe"
     subprocess.run([node, "--version"], env=env, check=True, timeout=10)
 
