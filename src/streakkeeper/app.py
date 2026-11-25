@@ -1,6 +1,5 @@
 import argparse
 from datetime import datetime
-import fcntl
 from pathlib import Path
 import subprocess
 import sys
@@ -17,6 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 from .core import DemoMessages, Status, Store, VIETNAM, check
+from .platform_support import default_data_dir, try_lock
 from .streak_browser import (
     HeadlessMessages, PlaywrightError, active_login_pid, chrome_session, close_login_chrome, open_inbox,
     login_required, open_login_chrome, read_inbox_snapshot, wait_for_owner,
@@ -181,6 +181,7 @@ class Window(QMainWindow):
         self.pages = QStackedWidget()
         group = QButtonGroup(self)
         self.navigation = group
+        shortcut_modifier = "⌘" if sys.platform == "darwin" else "Ctrl+"
         for index, (icon, title, builder) in enumerate((
             ("▦", "Dashboard", self.dashboard_page),
             ("ϟ", "TikTok", self.tiktok_page),
@@ -189,7 +190,7 @@ class Window(QMainWindow):
             ("⚙", "Settings", self.settings_page),
         )):
             self.pages.addWidget(builder())
-            button = QPushButton(f"{icon}   {title}     ⌘{index + 1}")
+            button = QPushButton(f"{icon}   {title}     {shortcut_modifier}{index + 1}")
             button.setAccessibleName(title)
             button.setProperty("nav", True)
             button.setCheckable(True)
@@ -831,8 +832,22 @@ class Window(QMainWindow):
         self.tray.setContextMenu(tray_menu)
         if QSystemTrayIcon.isSystemTrayAvailable():
             self.tray.show()
+        if sys.platform == "darwin":
+            QApplication.instance().applicationStateChanged.connect(self.restore_window_on_activation)
+        elif sys.platform == "win32":
+            self.tray.activated.connect(self.restore_window_from_tray)
+
+    def restore_window_on_activation(self, state):
+        if state == Qt.ApplicationState.ApplicationActive and (self.isHidden() or self.isMinimized()):
+            self.show_window()
+
+    def restore_window_from_tray(self, reason):
+        if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
+            self.show_window()
 
     def show_window(self):
+        if self.isMinimized():
+            self.setWindowState(self.windowState() & ~Qt.WindowState.WindowMinimized)
         self.show()
         self.raise_()
         self.activateWindow()
@@ -1081,16 +1096,14 @@ class Window(QMainWindow):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data-dir", type=Path, default=Path.home() / "Library/Application Support/StreakKeeper")
+    parser.add_argument("--data-dir", type=Path, default=default_data_dir())
     parser.add_argument("--demo", action="store_true", help="Chạy với dữ liệu mô phỏng.")
     args = parser.parse_args()
     data_dir = args.data_dir.expanduser().resolve()
     data_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
     lock_name = "demo.lock" if args.demo else "app.lock"
-    with (data_dir / lock_name).open("w") as lock:
-        try:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
+    with (data_dir / lock_name).open("a+b") as lock:
+        if not try_lock(lock):
             print("StreakKeeper đang chạy với thư mục dữ liệu này.", file=sys.stderr)
             return 1
         app = QApplication(sys.argv[:1])

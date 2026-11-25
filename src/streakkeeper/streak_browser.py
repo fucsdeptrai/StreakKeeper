@@ -1,9 +1,10 @@
 import json
 from contextlib import contextmanager
-import fcntl
 from datetime import date, datetime, time, timedelta
+import os
 from pathlib import Path
 import subprocess
+import sys
 from threading import Event
 import time as clock
 from uuid import uuid4
@@ -11,6 +12,7 @@ from uuid import uuid4
 from playwright.sync_api import Error as PlaywrightError, sync_playwright
 
 from .core import Status, VIETNAM
+from .platform_support import try_lock
 from .tiktok import SNAPSHOT, TIKTOK_INBOX, TIKTOK_OWNER_JS
 
 CHROME_EXECUTABLE = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
@@ -105,19 +107,23 @@ STREAK_ACTION = r"""
 @contextmanager
 def chrome_session(profile: Path):
     profile.mkdir(mode=0o700, parents=True, exist_ok=True)
-    with (profile.parent / "streak-chrome.lock").open("a") as lock:
-        try:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError as exc:
-            raise ValueError("Hồ sơ TikTok riêng đang được dùng. Hãy đợi lượt đăng nhập hoặc giữ chuỗi kết thúc.") from exc
+    with (profile.parent / "streak-chrome.lock").open("a+b") as lock:
+        if not try_lock(lock):
+            raise ValueError("Hồ sơ TikTok riêng đang được dùng. Hãy đợi lượt đăng nhập hoặc giữ chuỗi kết thúc.")
+        if sys.platform == "win32":
+            browser_options = {"executable_path": chrome_executable()}
+        else:
+            browser_options = {
+                "channel": "chrome",
+                # Keep the same Keychain storage as the visible setup browser.
+                "ignore_default_args": ["--use-mock-keychain", "--password-store=basic"],
+            }
         with sync_playwright() as playwright:
             try:
                 context = playwright.chromium.launch_persistent_context(
-                    profile, channel="chrome", headless=True, chromium_sandbox=True,
+                    profile, headless=True, chromium_sandbox=True,
                     timezone_id=str(VIETNAM), timeout=12000,
-                    # The visible setup browser saves its session using Chrome
-                    # and macOS Keychain. Open that same profile the same way.
-                    ignore_default_args=["--use-mock-keychain", "--password-store=basic"],
+                    **browser_options,
                 )
             except PlaywrightError as exc:
                 raise ValueError("Không khởi động được Chrome cho StreakKeeper. Kiểm tra Chrome đã được cài.") from exc
@@ -136,15 +142,56 @@ def login_required(page) -> bool:
     return page.url.startswith("https://www.tiktok.com/login")
 
 
+def chrome_executable() -> Path:
+    if sys.platform != "win32":
+        return Path(CHROME_EXECUTABLE)
+    for variable in ("LOCALAPPDATA", "PROGRAMFILES", "PROGRAMFILES(X86)"):
+        if root := os.environ.get(variable):
+            path = Path(root) / "Google" / "Chrome" / "Application" / "chrome.exe"
+            if path.is_file():
+                return path
+    raise ValueError("Chưa tìm thấy Google Chrome. Cài Chrome rồi mở lại phần đăng nhập TikTok.")
+
+
 def open_login_chrome(profile: Path):
     profile.mkdir(mode=0o700, parents=True, exist_ok=True)
+    args = [str(chrome_executable()), f"--user-data-dir={profile}", "--no-first-run"]
+    if sys.platform == "win32":
+        args.append("--disable-background-mode")
     return subprocess.Popen(
-        [CHROME_EXECUTABLE, f"--user-data-dir={profile}", "--no-first-run", TIKTOK_INBOX],
+        [*args, TIKTOK_INBOX],
         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     )
 
 
 def active_login_pid(profile: Path) -> int | None:
+    matches = windows_login_pids(profile) if sys.platform == "win32" else macos_login_pids(profile)
+    if len(matches) > 1:
+        raise ValueError("Có nhiều cửa sổ thiết lập đang dùng cùng hồ sơ. Thoát các cửa sổ thiết lập rồi thử lại.")
+    return matches[0] if matches else None
+
+
+def windows_login_pids(profile: Path) -> list[int]:
+    import psutil
+
+    executable = chrome_executable()
+    matches = []
+    for process in psutil.process_iter(["name"]):
+        if (process.info["name"] or "").lower() != "chrome.exe":
+            continue
+        try:
+            args = process.cmdline()[1:]
+            if any(arg.startswith(("--type=", "--headless")) for arg in args):
+                continue
+            if any(arg.startswith("--user-data-dir=") and Path(arg.partition("=")[2]) == profile for arg in args):
+                if Path(process.exe()) == executable:
+                    matches.append(process.pid)
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
+    return matches
+
+
+def macos_login_pids(profile: Path) -> list[int]:
     rows = subprocess.check_output(["/bin/ps", "-axo", "pid=,args="], text=True, timeout=2)
     prefix = CHROME_EXECUTABLE + " "
     profile_argument = f" --user-data-dir={profile} "
@@ -156,27 +203,36 @@ def active_login_pid(profile: Path) -> int | None:
         pid, command = fields
         if command.startswith(prefix) and profile_argument in command + " " and " --headless" not in command:
             matches.append(int(pid))
-    if len(matches) > 1:
-        raise ValueError("Có nhiều cửa sổ thiết lập đang dùng cùng hồ sơ. Thoát các cửa sổ thiết lập rồi thử lại.")
-    return matches[0] if matches else None
+    return matches
 
 
 def close_login_chrome(profile: Path):
     pid = active_login_pid(profile)
     if pid is None:
         return
-    script = """
+    try:
+        if sys.platform == "win32":
+            powershell = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32/WindowsPowerShell/v1.0/powershell.exe"
+            script = (
+                f"$chrome = Get-Process -Id {pid} -ErrorAction SilentlyContinue; "
+                "if ($chrome -and -not ($chrome.CloseMainWindow())) { exit 1 }"
+            )
+            subprocess.run(
+                [str(powershell), "-NoProfile", "-NonInteractive", "-Command", script],
+                capture_output=True, check=True, timeout=5, creationflags=subprocess.CREATE_NO_WINDOW,
+            )
+        else:
+            script = """
 ObjC.import('AppKit');
 function run(argv) {
     const app = $.NSRunningApplication.runningApplicationWithProcessIdentifier(Number(argv[0]));
     return Boolean(app.terminate);
 }
 """
-    try:
-        subprocess.run(
-            ["/usr/bin/osascript", "-l", "JavaScript", "-", str(pid)],
-            input=script, text=True, capture_output=True, check=True, timeout=5,
-        )
+            subprocess.run(
+                ["/usr/bin/osascript", "-l", "JavaScript", "-", str(pid)],
+                input=script, text=True, capture_output=True, check=True, timeout=5,
+            )
         deadline = clock.monotonic() + 12
         while clock.monotonic() < deadline:
             if active_login_pid(profile) is None:

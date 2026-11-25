@@ -1,5 +1,7 @@
 .venv/
 dist/
+build/
+/StreakKeeper.spec
 __pycache__/
 *.egg-info/
 .DS_Store
