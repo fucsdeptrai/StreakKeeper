@@ -8,13 +8,13 @@ App dùng Google Chrome đã cài trên máy. Gói tải đã kèm Python và c�
 
 ### Windows x64
 
-**[Tải StreakKeeper 0.1.3 cho Windows x64](https://github.com/fucsdeptrai/StreakKeeper/releases/download/v0.1.3-windows/StreakKeeper-0.1.3-windows-x64.zip)** · [SHA-256](https://github.com/fucsdeptrai/StreakKeeper/releases/download/v0.1.3-windows/StreakKeeper-0.1.3-windows-x64.zip.sha256)
+**[Tải StreakKeeper 0.1.4 cho Windows x64](https://github.com/fucsdeptrai/StreakKeeper/releases/download/v0.1.4/StreakKeeper-0.1.4-windows-x64.zip)** · [SHA-256](https://github.com/fucsdeptrai/StreakKeeper/releases/download/v0.1.4/StreakKeeper-0.1.4-windows-x64.zip.sha256)
 
 Giải nén toàn bộ ZIP và mở **StreakKeeper.exe** trong thư mục vừa giải nén. Bấm **Thu nhỏ** để app tiếp tục chạy và mở lại từ thanh tác vụ. Bấm **X** hoặc chọn **StreakKeeper → Thoát** để dừng app. Bản thử chưa có chữ ký số.
 
 ### Mac Apple Silicon
 
-**[Tải StreakKeeper 0.1.0 cho Mac Apple Silicon](https://github.com/fucsdeptrai/StreakKeeper/releases/download/v0.1.0/StreakKeeper-0.1.0-macos-arm64.dmg)** (DMG, 85 MB) · [SHA-256](https://github.com/fucsdeptrai/StreakKeeper/releases/download/v0.1.0/StreakKeeper-0.1.0-macos-arm64.dmg.sha256)
+**[Tải StreakKeeper 0.1.4 cho Mac Apple Silicon](https://github.com/fucsdeptrai/StreakKeeper/releases/download/v0.1.4/StreakKeeper-0.1.4-macos-arm64.dmg)** · [SHA-256](https://github.com/fucsdeptrai/StreakKeeper/releases/download/v0.1.4/StreakKeeper-0.1.4-macos-arm64.dmg.sha256)
 
 Bản Mac đã được thử trên macOS 26.5.
 
@@ -27,7 +27,7 @@ Lần đầu, vào **Settings → Đăng nhập TikTok cho chế độ nền** v
 
 Bấm **Mở hộp thư** để đọc danh sách ở nền. Nhấp đúp vào tên chat để xem số tin và mốc giờ trên Dashboard. Bạn có thể chọn **Giữ chuỗi**, đặt **Tin nhắn chung** hoặc sửa **Tin nhắn riêng**. Chỉ chat đã chọn đủ điều kiện gửi.
 
-Bấm **Chạy giữ chuỗi** để gửi cho các chat đã chọn nếu app chưa ghi nhận gửi thành công hôm nay, tính theo giờ Việt Nam. Tin bạn gửi thủ công không chặn lượt gửi. Nếu kết quả chưa rõ, lần bấm tiếp theo có thể thử lại. Cả đọc hộp thư và chạy giữ chuỗi dùng cùng hồ sơ riêng ở chế độ headless. Xem kết quả trong **Nhật ký** (bản Mac 0.1.0 hiển thị **Activity Log**).
+Bấm **Chạy giữ chuỗi** để gửi cho các chat đã chọn nếu app chưa ghi nhận gửi thành công hôm nay, tính theo giờ Việt Nam. Tin bạn gửi thủ công không chặn lượt gửi. Nếu kết quả chưa rõ, lần bấm tiếp theo có thể thử lại. Cả đọc hộp thư và chạy giữ chuỗi dùng cùng hồ sơ riêng ở chế độ headless. Xem kết quả trong **Nhật ký**.
 
 Trong **Settings → Lịch gửi tự động**, bật tự động giữ chuỗi nếu bạn muốn app gửi khi đang chạy. Mặc định, lượt đầu bắt đầu khi có chat cần gửi. Có thể đặt giờ bắt đầu mỗi ngày theo giờ Việt Nam. Các lượt sau cách 15 phút và chỉ xử lý chat còn thiếu. Khi gửi đủ, app chờ ngày mới hoặc một chat mới được chọn. Lịch vẫn chạy khi thu cửa sổ xuống. Nút **Tạm dừng** dừng lượt tự động.
 
