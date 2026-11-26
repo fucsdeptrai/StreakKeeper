@@ -22,6 +22,7 @@ from .streak_browser import (
     login_required, open_login_chrome, read_inbox_snapshot, wait_for_owner,
 )
 from .streak_schedule import next_streak_run, pending_streak_chats
+from .streak_video import read_feed_video
 from .theme import STYLESHEET
 
 
@@ -138,6 +139,25 @@ class InboxRead(QThread):
             self.error = str(exc) if isinstance(exc, ValueError) else "Không đọc được hộp thư ở nền."
 
 
+class VideoRefresh(QThread):
+    def __init__(self, profile, owner, day, parent):
+        super().__init__(parent)
+        self.profile = profile
+        self.owner = owner
+        self.day = day
+        self.cancelled = Event()
+        self.url = ""
+
+    def run(self):
+        try:
+            if active_login_pid(self.profile) is None:
+                with chrome_session(self.profile) as page:
+                    if not self.cancelled.is_set():
+                        self.url = read_feed_video(page, self.cancelled, owner=self.owner)
+        except (OSError, ValueError, PlaywrightError, subprocess.SubprocessError):
+            pass
+
+
 class Window(QMainWindow):
     def __init__(self, store: Store, data_dir: Path, *, demo: bool = False):
         super().__init__()
@@ -148,6 +168,8 @@ class Window(QMainWindow):
         self.reader = None
         self.streak_run = None
         self.streak_login = None
+        self.video_refresh = None
+        self.send_after_video = False
         self.streak_profile = data_dir / "headless-chrome"
         self.streak_results = []
         self.last_tick = time.time()
@@ -444,6 +466,13 @@ class Window(QMainWindow):
         self.streak_content.editingFinished.connect(self.save_streak_content)
         message_row.addWidget(self.streak_content, 1)
         controls.addLayout(message_row)
+        self.video_enabled = QCheckBox("Tự lấy video từ bảng tin TikTok")
+        self.video_enabled.setChecked(self.store.get("streak_video_enabled") == "1")
+        controls.addWidget(self.video_enabled)
+        self.video_status = self.label("", "noteText")
+        self.video_status.setWordWrap(True)
+        controls.addWidget(self.video_status)
+        self.video_enabled.toggled.connect(self.save_video_settings)
         controls.addWidget(self.notice(
             "Giữ chuỗi và nội dung gửi",
             "Chọn Giữ chuỗi để thêm chat vào lượt gửi.",
@@ -462,16 +491,94 @@ class Window(QMainWindow):
         self.chat_summary = self.label("", "noteText")
         self.chat_summary.setWordWrap(True)
         layout.addWidget(self.chat_summary)
+        self.update_video_content()
         return page
 
     def save_streak_content(self):
+        if self.streak_content.isReadOnly():
+            return
         content = self.streak_content.text().strip() or "."
         self.streak_content.setText(content)
         self.store.set("streak_content", content)
+        self.refresh_streak_tooltips()
+
+    def refresh_streak_tooltips(self):
         self.live_table.blockSignals(True)
         for row in range(self.live_table.rowCount()):
             self.update_streak_tooltip(row)
         self.live_table.blockSignals(False)
+
+    def save_video_settings(self):
+        enabled = self.video_enabled.isChecked()
+        if not enabled and self.video_refresh is not None:
+            self.video_refresh.cancelled.set()
+        self.store.set("streak_video_enabled", "1" if enabled else "0")
+        self.update_video_content()
+        QTimer.singleShot(0, self.maybe_run_auto)
+
+    def update_video_content(self):
+        enabled = self.store.get("streak_video_enabled") == "1"
+        owner = self.store.get("tiktok_headless_owner")
+        cached = self.store.get(f"streak_feed_url/{owner}") if enabled and owner else ""
+        was_read_only = self.streak_content.isReadOnly()
+        self.streak_content.setReadOnly(bool(cached))
+        if cached or was_read_only or not self.streak_content.hasFocus():
+            self.streak_content.setText(self.store.common_streak_message())
+        self.refresh_streak_tooltips()
+        self.video_status.setVisible(enabled)
+        if not enabled:
+            return
+        today = datetime.now(VIETNAM).date().isoformat()
+        if not owner:
+            status = "Kết nối TikTok trong Settings để lấy video từ bảng tin."
+        elif self.video_refresh is not None and self.video_refresh.owner == owner:
+            status = "Đang tìm video trên bảng tin Dành cho bạn…"
+        elif self.store.get(f"streak_feed_updated/{owner}") == today:
+            status = "Đã lấy link video hôm nay."
+        elif cached:
+            status = "Đang dùng lại link video đã lưu."
+        elif self.store.get(f"streak_feed_checked/{owner}") == today:
+            status = "Chưa lấy được video. Đang dùng tin nhắn chung bạn đã nhập."
+        else:
+            status = "App lấy link video đầu tiên trong bảng tin Dành cho bạn mỗi ngày."
+        self.video_status.setText(status)
+
+    def maybe_refresh_video(self, now):
+        if (self.browser_busy() or self.store.get("paused") == "1"
+                or self.store.get("streak_video_enabled") != "1"):
+            return False
+        owner = self.store.get("tiktok_headless_owner")
+        day = now.date().isoformat()
+        if not owner or self.store.get(f"streak_feed_checked/{owner}") == day:
+            return False
+        if not (self.streak_profile / "Local State").is_file():
+            return False
+        worker = VideoRefresh(self.streak_profile, owner, day, self)
+        self.video_refresh = worker
+        worker.finished.connect(self.finish_video_refresh)
+        self.update_video_content()
+        self.update_summary()
+        worker.start()
+        return True
+
+    def finish_video_refresh(self):
+        worker, self.video_refresh = self.video_refresh, None
+        if not worker.cancelled.is_set():
+            if worker.url:
+                self.store.set(f"streak_feed_url/{worker.owner}", worker.url)
+                self.store.set(f"streak_feed_updated/{worker.owner}", worker.day)
+            self.store.set(f"streak_feed_checked/{worker.owner}", worker.day)
+        worker.deleteLater()
+        self.update_video_content()
+        self.update_summary()
+        if self.send_after_video:
+            self.send_after_video = False
+            QTimer.singleShot(0, self.start_streak_run)
+        else:
+            QTimer.singleShot(0, self.maybe_run_auto)
+
+    def browser_busy(self):
+        return any(worker is not None for worker in (self.reader, self.streak_run, self.streak_login, self.video_refresh))
 
     def update_streak_chat(self, item):
         owner = self.store.get("tiktok_headless_owner")
@@ -521,7 +628,7 @@ class Window(QMainWindow):
         self.live_table.blockSignals(False)
 
     def start_streak_run(self, *, pending=None):
-        if self.reader is not None or self.streak_run is not None or self.streak_login is not None or self.store.get("paused") == "1":
+        if self.browser_busy() or self.store.get("paused") == "1":
             return
         owner = self.store.get("tiktok_headless_owner")
         if not owner or not (self.streak_profile / "Local State").is_file():
@@ -530,6 +637,9 @@ class Window(QMainWindow):
         self.save_streak_content()
         if not any(enabled for enabled, _ in self.store.streak_chats(owner).values()):
             self.set_streak_summary("Vào TikTok và đánh dấu Giữ chuỗi cho ít nhất một chat.")
+            return
+        if self.maybe_refresh_video(datetime.now(VIETNAM)):
+            self.send_after_video = pending is None
             return
         self.streak_results = []
         self.set_streak_summary("Đang gửi tự động…" if pending is not None else "Đang xử lý các chat đã chọn…")
@@ -574,13 +684,13 @@ class Window(QMainWindow):
         QTimer.singleShot(0, self.maybe_run_auto)
 
     def stop_streak_run(self):
-        for worker in (self.reader, self.streak_run, self.streak_login):
+        for worker in (self.reader, self.streak_run, self.streak_login, self.video_refresh):
             if worker is not None:
                 worker.cancelled.set()
                 worker.wait()
 
     def start_streak_login(self):
-        if self.reader is not None or self.streak_run is not None or self.streak_login is not None:
+        if self.browser_busy():
             return
         try:
             if active_login_pid(self.streak_profile) is not None:
@@ -598,7 +708,7 @@ class Window(QMainWindow):
         self.streak_login_status.setText("Đăng nhập tài khoản TikTok bạn muốn dùng. Khi hộp thư mở được, bấm Kiểm tra đăng nhập.")
 
     def verify_streak_login(self):
-        if self.reader is not None or self.streak_run is not None or self.streak_login is not None:
+        if self.browser_busy():
             return
         if not (self.streak_profile / "Local State").is_file():
             self.streak_login_status.setText("Đăng nhập TikTok cho hồ sơ nền trước khi kiểm tra.")
@@ -615,6 +725,7 @@ class Window(QMainWindow):
         if worker.owner:
             changed = worker.owner != self.store.get("tiktok_headless_owner")
             self.store.confirm_tiktok_account(worker.owner)
+            self.update_video_content()
             self.store.set(f"auto_streak_auth/{worker.owner}", "")
             self.streak_login_status.setText(f"Đã kết nối @{worker.owner}. Mở hộp thư để chọn chat giữ chuỗi.")
             if changed:
@@ -831,10 +942,12 @@ class Window(QMainWindow):
         if self.demo:
             return False
         now = datetime.now(VIETNAM)
+        if self.maybe_refresh_video(now):
+            return True
         status, due, pending = self.auto_schedule(now)
         self.dashboard_auto_status.setText(status)
         self.settings_auto_status.setText(status)
-        if due is None or due > now or self.reader is not None or self.streak_login is not None:
+        if due is None or due > now or self.browser_busy():
             return False
         self.start_streak_run(pending=pending)
         return self.streak_run is not None
@@ -844,6 +957,7 @@ class Window(QMainWindow):
             self.maybe_run_auto()
         else:
             self.run_check()
+            self.maybe_run_auto()
 
     def setup_tray(self):
         self.tray = QSystemTrayIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_ComputerIcon), self)
@@ -1021,6 +1135,8 @@ class Window(QMainWindow):
         self.store.set("paused", "0" if paused else "1")
         if not paused and self.streak_run is not None:
             self.streak_run.cancelled.set()
+        if not paused and self.video_refresh is not None:
+            self.video_refresh.cancelled.set()
         self.update_summary()
         if paused and not self.demo:
             QTimer.singleShot(0, self.maybe_run_auto)
@@ -1033,12 +1149,13 @@ class Window(QMainWindow):
         if self.demo:
             self.next_run.setText("Đang tạm dừng" if paused else f"Lượt kế tiếp · {next_time:%d/%m %H:%M}")
         else:
-            can_run = not paused and self.reader is None and self.streak_run is None and self.streak_login is None
+            browser_available = not self.browser_busy()
+            can_run = not paused and browser_available
             self.read_button.setEnabled(can_run)
             self.streak_button.setEnabled(can_run)
             self.dashboard_streak_button.setEnabled(can_run)
-            self.streak_login_button.setEnabled(self.reader is None and self.streak_login is None and self.streak_run is None)
-            self.streak_verify_button.setEnabled(self.reader is None and self.streak_login is None and self.streak_run is None)
+            self.streak_login_button.setEnabled(browser_available)
+            self.streak_verify_button.setEnabled(browser_available)
             status, _, _ = self.auto_schedule(datetime.now(VIETNAM))
             self.dashboard_auto_status.setText(status)
             self.settings_auto_status.setText(status)
@@ -1051,7 +1168,7 @@ class Window(QMainWindow):
         self.pause_button.setText("Tiếp tục" if paused else "Tạm dừng")
         self.pause_action.setChecked(paused)
         self.check_button.setEnabled(
-            not paused and self.reader is None and self.streak_run is None and self.streak_login is None
+            not paused and not self.browser_busy()
         )
 
     def tick(self):
@@ -1060,9 +1177,10 @@ class Window(QMainWindow):
         self.last_tick = now
         if not self.demo and datetime.fromtimestamp(now, VIETNAM).date() != self.dashboard_day:
             self.refresh_streak_history()
-        if not self.demo and self.auto_streak_enabled():
+        if not self.demo:
             self.maybe_run_auto()
-            return
+            if self.auto_streak_enabled():
+                return
         if now >= self.next_check or timer_gap > 45 or timer_gap < 0:
             self.run_check()
 
@@ -1070,7 +1188,7 @@ class Window(QMainWindow):
         self.run_check()
 
     def run_check(self):
-        if self.store.get("paused") == "1" or self.reader is not None or self.streak_run is not None:
+        if self.store.get("paused") == "1" or self.browser_busy():
             return
         self.next_check = time.time() + 3600
         if not self.demo:
@@ -1091,7 +1209,7 @@ class Window(QMainWindow):
             self.read_inbox(item.data(Qt.ItemDataRole.UserRole))
 
     def read_inbox(self, target=""):
-        if self.reader is not None or self.streak_run is not None or self.streak_login is not None:
+        if self.browser_busy():
             return
         if not (self.streak_profile / "Local State").is_file():
             self.complete_read("Vào Settings để đăng nhập TikTok cho hồ sơ nền.")
@@ -1114,6 +1232,7 @@ class Window(QMainWindow):
             return
         conversations = snapshot["conversations"]
         self.store.confirm_tiktok_account(snapshot["owner"])
+        self.update_video_content()
         self.store.set(f"auto_streak_auth/{snapshot['owner']}", "")
         self.show_conversations(conversations)
         self.refresh_streak_history()

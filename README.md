@@ -31,6 +31,8 @@ Bấm **Chạy giữ chuỗi** để gửi cho các chat đã chọn nếu app c
 
 Trong **Settings → Lịch gửi tự động**, bật tự động giữ chuỗi nếu bạn muốn app gửi khi đang chạy. Mặc định, lượt đầu bắt đầu khi có chat cần gửi. Có thể đặt giờ bắt đầu mỗi ngày theo giờ Việt Nam. Các lượt sau cách 15 phút và chỉ xử lý chat còn thiếu. Khi gửi đủ, app chờ ngày mới hoặc một chat mới được chọn. Lịch vẫn chạy khi thu cửa sổ xuống. Nút **Tạm dừng** dừng lượt tự động.
 
+Trong **TikTok**, bật **Tự lấy video từ bảng tin TikTok**. App kiểm tra bảng tin **Dành cho bạn** của hồ sơ đang kết nối một lần mỗi ngày theo giờ Việt Nam và điền link video đầu tiên vào **Tin nhắn chung**. Nếu không đọc được bảng tin, app dùng link đã lưu của tài khoản đó. Nếu chưa lưu link nào, app dùng nội dung chung đã nhập. Nội dung riêng của từng chat vẫn được ưu tiên.
+
 ## Phát triển
 
 Chạy bản dev từ mã nguồn bằng `uv run streakkeeper`.

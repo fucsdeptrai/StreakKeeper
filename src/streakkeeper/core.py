@@ -125,12 +125,23 @@ class Store:
             with self.connect() as db:
                 return self.streak_message(owner, conversation_id, db)
         row = connection.execute(
-            "SELECT COALESCE(NULLIF(message, ''), "
-            "(SELECT NULLIF(value, '') FROM settings WHERE key = 'streak_content'), '.') "
+            "SELECT message "
             "FROM account_streak_chats WHERE owner = ? AND conversation_id = ? AND enabled = 1",
             (owner, conversation_id),
         ).fetchone()
-        return row[0] if row else None
+        return (row[0] or self.common_streak_message(connection, owner=owner)) if row else None
+
+    def common_streak_message(self, connection=None, *, owner=None) -> str:
+        if connection is None:
+            with self.connect() as db:
+                return self.common_streak_message(db, owner=owner)
+        settings = dict(connection.execute("SELECT key, value FROM settings"))
+        owner = owner or settings.get("tiktok_headless_owner")
+        if settings.get("streak_video_enabled") == "1" and owner:
+            cached = settings.get(f"streak_feed_url/{owner}")
+            if cached:
+                return cached
+        return settings.get("streak_content") or "."
 
     def confirmed_streak_chats(self, owner: str, day: str) -> set[str]:
         prefix = f"{owner}/"
